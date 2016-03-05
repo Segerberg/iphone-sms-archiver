@@ -195,6 +195,6 @@ FROM
         shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
 ###Write the XML to a file named after chat_id###
 tree = ET.ElementTree(xmlConversation)
-tree.write(chatIdChoice+'/content/'+chatIdChoice+'.xml')
+tree.write(chatIdChoice+'/content/'+chatIdChoice+'.xml', encoding='utf-8', xml_declaration=True)
 #ET.dump(xmlConversation)
 
