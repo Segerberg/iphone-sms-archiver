@@ -1,4 +1,4 @@
-Iarchiver
+iphone-sms-archiver
 ==========================================
 Apple offers no easy way to export your texts and iMessages there are software available to do exports, most of them are however commercial products, and there doesn’t seem to be a free, open source option that’s “good enough”.
 
