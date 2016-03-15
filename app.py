@@ -7,12 +7,15 @@ import sqlite3
 import xml.etree.cElementTree as ET
 import hashlib
 import shutil
+import uuid
+
 
 ### I don't know of any elegant way to get the phone owners name. An input prompt is the only option right now ##
-
-myFname = raw_input('Please enter your firstname and press enter: ')
-mySname = raw_input('Please enter your Surname and press enter: ')
-
+operatorAgentFName = 'Andreas'
+operatorAgentSName = 'Segerberg'
+myFname = raw_input('Please enter phone owners firstname and press enter: ')
+mySname = raw_input('Please enter phone owners surname and press enter: ')
+timeStamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M:%S') # Get the current datetimestamp for use as PREMIS-metadata
 
 
 ### Get the current users name ###
@@ -133,13 +136,49 @@ if not os.path.exists(chatIdChoice+'/system'):
 if not os.path.exists(chatIdChoice+'/metadata'):
     os.makedirs(chatIdChoice+'/metadata')
 
+xmlConversation = ET.Element('conversation') #Create the root element <conversation>
+
+###Create the PREMIS intellectualEntity e.g. this application###
+premis = ET.Element('premis') #Create the root element premis
+premis.set('xmlns:xlink','http://www.w3.org/1999/xlink')
+premis.set('xmlns:xsi','http://www.w3.org/2001/XMLSchema-instance')
+premis.set('xmlns','http://www.loc.gov/premis/v3')
+premis.set('xsi:schemaLocation','info:lc/xmlns/premis-v3 http://www.loc.gov/standards/premis/premis.xsd')
+premis.set('version','3.0')
+premisObject = ET.SubElement(premis,'object')
+premisObject.set('xsi:type','intellectualEntity')
+premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+premisObjectIdentfierType.text = 'local'
+premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+premisObjectIdentfierValue.text = '1'
+premisObjectEnvironmentFunction = ET.SubElement(premisObject,'environmentFunction')
+premisObjectEnvironmentFunctionEnvironmentFunctionType = ET.SubElement(premisObjectEnvironmentFunction,'environmentFunctionType')
+premisObjectEnvironmentFunctionEnvironmentFunctionType.text = 'software application'
+premisObjectEnvironmentFunctionEnvironmentFunctionLevel = ET.SubElement(premisObjectEnvironmentFunction,'environmentFunctionLevel')
+premisObjectEnvironmentFunctionEnvironmentFunctionLevel.text = '2'
+premisObjectEnvironmentDesignation = ET.SubElement(premisObject,'environmentDesignation')
+premisObjectEnvironmentDesignationEnvironmentName = ET.SubElement(premisObjectEnvironmentDesignation,'environmentName')
+premisObjectEnvironmentDesignationEnvironmentName.text = 'iphone-sms-archiver'
+premisObjectEnvironmentDesignationEnvironmentVersion = ET.SubElement(premisObjectEnvironmentDesignation,'environmentVersion')
+premisObjectEnvironmentDesignationEnvironmentVersion.text ='1.0'
+premisObjectEnvironmentDesignationEnvironmentOrigin = ET.SubElement(premisObjectEnvironmentDesignation,'environmentOrigin')
+premisObjectEnvironmentDesignationEnvironmentOrigin.text = 'Andreas Segerberg'
+premisObjectRelationship = ET.SubElement(premisObject,'relationship')
+premisObjectRelationshipRelationshipType = ET.SubElement(premisObjectRelationship,'relationshipType')
+premisObjectRelationshipRelationshipType.text = 'reference'
+premisObjectRelationshipRelationshipSubType = ET.SubElement(premisObjectRelationship,'relationshipSubType')
+premisObjectRelationshipRelationshipSubType.text = 'is documented in'
+premisObjectRelationshipRelatedObjectIdentifier = ET.SubElement(premisObjectRelationship,'relatedObjectIdentifier')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierType')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType.text = 'URL'
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierValue')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue.text = 'https://github.com/Segerberg/iphone-sms-archiver'
+
+
 # It's time to query the messages db and construct the xml-export
-
-xmlConversation = ET.Element('conversation') #Create the root-element <conversation>
-
-
 for row in mc.execute('''SELECT
-    CMJ.chat_id, M.guid, M.text, H.id, M.service, M.date, M.is_from_me, FILE.filename
+    CMJ.chat_id, M.guid, M.text, H.id, M.service, M.date, M.is_from_me, FILE.filename, FILE.mime_type
 FROM
     message  AS M
 	LEFT JOIN
@@ -155,12 +194,16 @@ FROM
 	on M.ROWID = CMJ.message_id
 	WHERE CMJ.chat_id ='''+chatIdChoice+'''
 	ORDER BY M.date'''):
-    xmlConversation.set('id',str(row[0])) # Set the chatid as an attribute to <conversation>
+
+    xmlConversation.set('id', str(uuid.uuid4())) # Give the conversation  a UUID
+    xmlConversation.set('chatId',str(row[0])) # Set the chatid as an attribute to <conversation>
     xmlMessage = ET.SubElement(xmlConversation,'message') # Create subelement <message>
     xmlDateTime = ET.SubElement(xmlMessage,'datetime') # Create subelement  <datetime>
 
     xmlFrom = ET.SubElement(xmlMessage,'from')
     xmlTo = ET.SubElement(xmlMessage,'to')
+
+    ###Handles the direction the message is sent###
     if row[6] == 1:
         xmlFromFname = ET.SubElement(xmlFrom,'fname')
         xmlFromSname = ET.SubElement(xmlFrom,'sname')
@@ -193,8 +236,123 @@ FROM
         formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
         xmlAttachment.text = '/attachments/'+hashSha.hexdigest()+'.'+formatName # write the modified path/filename to the xml-export
         shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
+
+        ###Create a PREMIS file object for every attachment###
+        premisObject = ET.SubElement(premis,'object')
+        premisObject.set('xsi:type','file')
+
+        premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+        premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+        premisObjectIdentfierType.text = 'sha-1'
+        premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+        premisObjectIdentfierValue.text = hashSha.hexdigest()
+        premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
+        premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
+        premisObjectObjectCharacteristicsCompositionLevel.text = '0'
+        premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
+        premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
+        premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
+        premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
+        premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName,'rb').read()).hexdigest()
+        premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
+        premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName))
+        premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
+        premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
+        premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
+        premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = row[8]
+        premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
+
+        premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
+        premisObjectObjectCharacteristicsCreatingApplicationDate.text = 'unknowed'
+        premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
+        premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
+        premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'localEventId'
+        premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
+        premisLinkingEventIdentifierLinkingEventIdentifierValue.text = '1'
+
+xmlUUID = str(uuid.uuid4()) # create a UUID; used for naming xml-file and PREMIS objectIdentifierValue (xml-file)
+
+
 ###Write the XML to a file named after chat_id###
 tree = ET.ElementTree(xmlConversation)
-tree.write(chatIdChoice+'/content/'+chatIdChoice+'.xml', encoding='utf-8', xml_declaration=True)
-#ET.dump(xmlConversation)
+tree.write(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', encoding='utf-8', xml_declaration=True)
+
+### Create a PREMIS file object for the generated xml-file ###
+premisObject = ET.SubElement(premis,'object')
+premisObject.set('xsi:type','file')
+
+premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+premisObjectIdentfierType.text = 'uuid'
+premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+premisObjectIdentfierValue.text = xmlUUID
+premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
+premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
+premisObjectObjectCharacteristicsCompositionLevel.text = '0'
+premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
+premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml'))
+premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
+premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = 'text/xml'
+premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
+
+premisObjectObjectCharacteristicsCreatingApplicationName = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'creatingApplicationName')
+premisObjectObjectCharacteristicsCreatingApplicationName.text = 'iphone-sms-archiver'
+premisObjectObjectCharacteristicsCreatingApplicationVersion = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'creatingApplicationVersion')
+premisObjectObjectCharacteristicsCreatingApplicationVersion.text = '1.0' #Change to easy modified variable
+premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
+premisObjectObjectCharacteristicsCreatingApplicationDate.text = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M:%S')
+premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
+premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
+premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'localEventId'
+premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
+premisLinkingEventIdentifierLinkingEventIdentifierValue.text = '1'
+
+###Create the PREMIS EVENT###
+premisEvent = ET.SubElement(premis,'event')
+premisEventEventIdentifier = ET.SubElement(premisEvent,'eventIdentifier')
+premisEventEventIdentifierEventIdentifierType = ET.SubElement(premisEventEventIdentifier,'eventIdentifierType')
+premisEventEventIdentifierEventIdentifierType.text = 'localEventId' # Should be a UUID
+premisEventEventIdentifierEventIdentifierValue = ET.SubElement(premisEventEventIdentifier,'eventIdentifierValue')
+premisEventEventIdentifierEventIdentifierValue.text = '1' # Should be a UUID
+premisEventEventType = ET.SubElement(premisEvent,'eventType')
+premisEventEventType.text = 'CAPTURE'
+premisEventEventDateTime = ET.SubElement(premisEvent,'eventDateTime')
+premisEventEventDateTime.text = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M:%S')# MOVE THIS TO SCRIPT START
+premisEventEventDetailInformation = ET.SubElement(premisEvent,'eventDetailInformation')
+premisEventEventDetailInformationEventDetail = ET.SubElement(premisEventEventDetailInformation,'eventDetail')
+premisEventEventDetailInformationEventDetail.text = 'Extract all attachments and make an xml-representation of selected conversation from iphone sqlite database '
+premisEventLinkingAgentIdentifier = ET.SubElement(premisEvent,'linkingAgentIdentifier')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierType = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentIdentifierType')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierType.text = 'localAgentId'
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentIdentifierValue')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue.text = '1'
+premisEventLinkingAgentIdentifierLinkingAgentRole = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentRole')
+premisEventLinkingAgentIdentifierLinkingAgentRole.text = 'executing program'
+
+premisAgent = ET.SubElement(premis,'agent')
+premisAgentAgentIdentifier = ET.SubElement(premisAgent ,'agentIdentifier')
+premisAgentAgentIdentifierAgentIdentifierType = ET.SubElement(premisAgentAgentIdentifier ,'agentIdentifierType')
+premisAgentAgentIdentifierAgentIdentifierType.text = 'localAgentId'
+premisAgentAgentIdentifierAgentIdentifierValue = ET.SubElement(premisAgentAgentIdentifier ,'agentIdentifierValue')
+premisAgentAgentIdentifierAgentIdentifierValue.text = '1'
+premisAgentAgentName = ET.SubElement(premisAgent ,'agentName')
+premisAgentAgentName.text = 'iphone-sms-archiver'
+premisAgentAgentType = ET.SubElement(premisAgent ,'agentType')
+premisAgentAgentType.text = 'software application'
+premisAgentAgentVersion = ET.SubElement(premisAgent ,'agentVersion')
+premisAgentAgentVersion.text = '1.0' #Change to easy modified variable
+premisAgentAgentLinkingEnvironmentIdentifier = ET.SubElement(premisAgent ,'linkingEnvironmentIdentifier')
+premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierType = ET.SubElement(premisAgentAgentLinkingEnvironmentIdentifier ,'linkingEnvironmentIdentifierType')
+premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierType.text = 'localObjectId'
+premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierValue = ET.SubElement(premisAgentAgentLinkingEnvironmentIdentifier ,'linkingEnvironmentIdentifierValue')
+premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierValue.text = '1'
+premisTree = ET.ElementTree(premis)
+premisTree.write(chatIdChoice+'/metadata/premis.xml', encoding='utf-8', xml_declaration=True)
 
