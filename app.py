@@ -9,6 +9,12 @@ import hashlib
 import shutil
 import uuid
 
+xmlUUID = str(uuid.uuid4()) # create a UUID; used for naming xml-file and PREMIS objectIdentifierValue (xml-file)
+xsdUUID = str(uuid.uuid4()) # create a UUID; used for PREMIS objectIdentifierValue (xsd-file)
+xslUUID = str(uuid.uuid4()) # create a UUID; used for PREMIS objectIdentifierValue (xsl-file)
+eventUUID = str(uuid.uuid4()) # create a UUID; used for giving Event a uuid
+####TO DO###
+#Create UUID for event
 
 ### I don't know of any elegant way to get the phone owners name. An input prompt is the only option right now ##
 operatorAgentFName = 'Andreas'
@@ -34,8 +40,8 @@ elif platform.system() == 'Windows':
     elif platform.release() =='Vista': # need to find the correct value for this
         backupPath =''
 
-    elif platform.release() =='7': # need to find the correct value for this
-        backupPath ='C:/Users/'+user+'/AppData/Roaming/Apple Computer/MobileSync/Backup'
+    elif platform.release() =='7':
+        backupPath ='C:/Users/'+user+'/AppData/Roaming/Apple Computer/MobileSync/Backup' # Need to confirm this is the correct path
 
     elif platform.release() =='8': # need to find the correct value for this
         backupPath =''
@@ -197,6 +203,9 @@ FROM
 
     xmlConversation.set('id', str(uuid.uuid4())) # Give the conversation  a UUID
     xmlConversation.set('chatId',str(row[0])) # Set the chatid as an attribute to <conversation>
+    xmlConversation.set('xmlns:xsi','http://www.w3.org/2001/XMLSchema-instance')
+    xmlConversation.set('xsi:noNamespaceSchemaLocation','../system/schema.xsd')
+
     xmlMessage = ET.SubElement(xmlConversation,'message') # Create subelement <message>
     xmlDateTime = ET.SubElement(xmlMessage,'datetime') # Create subelement  <datetime>
 
@@ -224,6 +233,7 @@ FROM
         xmlToSname.text = mySname
     xmlMessage.set('id',row[1])
     xmlMessage.set('service',row[4])
+    xmlMessage.set('isFromMe',str(row[6]))
     xmlText = ET.SubElement(xmlMessage,'text') # Create subelement  <text>
     xmlText.text = row[2]
     # We need to convert the cocoa timestamp to humanreadable time.
@@ -234,13 +244,12 @@ FROM
         xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
         hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-')) # change the string to the correct name before checksum calculation
         formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
-        xmlAttachment.text = '/attachments/'+hashSha.hexdigest()+'.'+formatName # write the modified path/filename to the xml-export
+        xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
         shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
 
         ###Create a PREMIS file object for every attachment###
         premisObject = ET.SubElement(premis,'object')
         premisObject.set('xsi:type','file')
-
         premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
         premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
         premisObjectIdentfierType.text = 'sha-1'
@@ -261,26 +270,87 @@ FROM
         premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
         premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = row[8]
         premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
-
         premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
         premisObjectObjectCharacteristicsCreatingApplicationDate.text = 'unknowed'
         premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
         premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
-        premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'localEventId'
+        premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
         premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
-        premisLinkingEventIdentifierLinkingEventIdentifierValue.text = '1'
-
-xmlUUID = str(uuid.uuid4()) # create a UUID; used for naming xml-file and PREMIS objectIdentifierValue (xml-file)
-
+        premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
 
 ###Write the XML to a file named after chat_id###
 tree = ET.ElementTree(xmlConversation)
-tree.write(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', encoding='utf-8', xml_declaration=True)
+tree.write(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', encoding='utf-8', xml_declaration=False)
+
+###We need to insert reference to the xslt###
+with open(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', "r+") as f:
+     firstXml = f.read() # read everything in the xml-file
+     f.seek(0) # Find the first line
+     f.write('''<?xml version='1.0' encoding='utf-8'?>\n<?xml-stylesheet type="text/xsl" href="../system/style.xsl"?>\n'''+ firstXml) # insert the xml-declaration, xslt path and then the rest of the data
+
+#####Make a copy of the xslt and xsd to the SIP ###
+shutil.copy2('style.xsl',chatIdChoice+'/system/style.xsl')
+shutil.copy2('schema.xsd',chatIdChoice+'/system/schema.xsd')
+
+### Create a PREMIS file object for the XSD-file ###
+premisObject = ET.SubElement(premis,'object')
+premisObject.set('xsi:type','file')
+premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+premisObjectIdentfierType.text = 'uuid'
+premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+premisObjectIdentfierValue.text = xsdUUID
+premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
+premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
+premisObjectObjectCharacteristicsCompositionLevel.text = '0'
+premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
+premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/system/schema.xsd','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/system/schema.xsd'))
+premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
+premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = 'text/xml'
+premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
+premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
+premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
+premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
+premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
+
+### Create a PREMIS file object for the XSL-file ###
+premisObject = ET.SubElement(premis,'object')
+premisObject.set('xsi:type','file')
+premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+premisObjectIdentfierType.text = 'uuid'
+premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+premisObjectIdentfierValue.text = xslUUID
+premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
+premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
+premisObjectObjectCharacteristicsCompositionLevel.text = '0'
+premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
+premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
+premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/system/style.xsl','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/system/style.xsl'))
+premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
+premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
+premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = 'text/xml'
+premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
+premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
+premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
+premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
+premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
 
 ### Create a PREMIS file object for the generated xml-file ###
 premisObject = ET.SubElement(premis,'object')
 premisObject.set('xsi:type','file')
-
 premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
 premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
 premisObjectIdentfierType.text = 'uuid'
@@ -301,26 +371,53 @@ premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisOb
 premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
 premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = 'text/xml'
 premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
-
 premisObjectObjectCharacteristicsCreatingApplicationName = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'creatingApplicationName')
 premisObjectObjectCharacteristicsCreatingApplicationName.text = 'iphone-sms-archiver'
 premisObjectObjectCharacteristicsCreatingApplicationVersion = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'creatingApplicationVersion')
 premisObjectObjectCharacteristicsCreatingApplicationVersion.text = '1.0' #Change to easy modified variable
 premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
 premisObjectObjectCharacteristicsCreatingApplicationDate.text = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M:%S')
+premisObjectRelationship = ET.SubElement(premisObject,'relationship')
+premisObjectRelationshipRelationshipType = ET.SubElement(premisObjectRelationship,'relationshipType')
+premisObjectRelationshipRelationshipType.text = 'dependency'
+premisObjectRelationshipRelationshipSubType = ET.SubElement(premisObjectRelationship,'relationshipSubType')
+premisObjectRelationshipRelationshipSubType.text = 'requires'
+premisObjectRelationshipRelatedObjectIdentifier = ET.SubElement(premisObjectRelationship,'relatedObjectIdentifier')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierType')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType.text = 'uuid'
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierValue')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue.text = xsdUUID
+premisObjectRelationshipRelatedEnvironmentPurpose = ET.SubElement(premisObjectRelationship,'relatedEnvironmentPurpose')
+premisObjectRelationshipRelatedEnvironmentPurpose.text ='validate'
+premisObjectRelationshipRelatedEnvironmentCharacteristic = ET.SubElement(premisObjectRelationship,'relatedEnvironmentCharacteristic')
+premisObjectRelationshipRelatedEnvironmentCharacteristic.text = 'known to work'
+premisObjectRelationship = ET.SubElement(premisObject,'relationship')
+premisObjectRelationshipRelationshipType = ET.SubElement(premisObjectRelationship,'relationshipType')
+premisObjectRelationshipRelationshipType.text = 'dependency'
+premisObjectRelationshipRelationshipSubType = ET.SubElement(premisObjectRelationship,'relationshipSubType')
+premisObjectRelationshipRelationshipSubType.text = 'requires'
+premisObjectRelationshipRelatedObjectIdentifier = ET.SubElement(premisObjectRelationship,'relatedObjectIdentifier')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierType')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType.text = 'uuid'
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierValue')
+premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue.text = xslUUID
+premisObjectRelationshipRelatedEnvironmentPurpose = ET.SubElement(premisObjectRelationship,'relatedEnvironmentPurpose')
+premisObjectRelationshipRelatedEnvironmentPurpose.text ='rendering'
+premisObjectRelationshipRelatedEnvironmentCharacteristic = ET.SubElement(premisObjectRelationship,'relatedEnvironmentCharacteristic')
+premisObjectRelationshipRelatedEnvironmentCharacteristic.text = 'known to work'
 premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
 premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
-premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'localEventId'
+premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
 premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
-premisLinkingEventIdentifierLinkingEventIdentifierValue.text = '1'
+premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
 
 ###Create the PREMIS EVENT###
 premisEvent = ET.SubElement(premis,'event')
 premisEventEventIdentifier = ET.SubElement(premisEvent,'eventIdentifier')
 premisEventEventIdentifierEventIdentifierType = ET.SubElement(premisEventEventIdentifier,'eventIdentifierType')
-premisEventEventIdentifierEventIdentifierType.text = 'localEventId' # Should be a UUID
+premisEventEventIdentifierEventIdentifierType.text = 'uuid'
 premisEventEventIdentifierEventIdentifierValue = ET.SubElement(premisEventEventIdentifier,'eventIdentifierValue')
-premisEventEventIdentifierEventIdentifierValue.text = '1' # Should be a UUID
+premisEventEventIdentifierEventIdentifierValue.text = eventUUID
 premisEventEventType = ET.SubElement(premisEvent,'eventType')
 premisEventEventType.text = 'CAPTURE'
 premisEventEventDateTime = ET.SubElement(premisEvent,'eventDateTime')
@@ -336,6 +433,7 @@ premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue.text = '1'
 premisEventLinkingAgentIdentifierLinkingAgentRole = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentRole')
 premisEventLinkingAgentIdentifierLinkingAgentRole.text = 'executing program'
 
+###Create a softwareAgent for this script###
 premisAgent = ET.SubElement(premis,'agent')
 premisAgentAgentIdentifier = ET.SubElement(premisAgent ,'agentIdentifier')
 premisAgentAgentIdentifierAgentIdentifierType = ET.SubElement(premisAgentAgentIdentifier ,'agentIdentifierType')
