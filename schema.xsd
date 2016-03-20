@@ -1,0 +1,46 @@
+<xs:schema attributeFormDefault="unqualified" elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="conversation">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="message" maxOccurs="unbounded" minOccurs="0">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element type="xs:string" name="datetime" maxOccurs="1" minOccurs="1"/>
+              <xs:element name="from" maxOccurs="1" minOccurs="1">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element type="xs:string" name="fname" maxOccurs="1" minOccurs="1"/>
+                    <xs:element type="xs:string" name="sname" maxOccurs="1" minOccurs="1"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="to" maxOccurs="1" minOccurs="1">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element type="xs:string" name="fname" maxOccurs="1" minOccurs="1"/>
+                    <xs:element type="xs:string" name="sname" maxOccurs="1" minOccurs="1"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element type="xs:string" name="text"/>
+              <xs:element name="attachment" maxOccurs="1" minOccurs="0">
+                <xs:complexType>
+                  <xs:simpleContent>
+                    <xs:extension base="xs:string">
+                      <xs:attribute type="xs:string" name="file" use="required"/>
+                    </xs:extension>
+                  </xs:simpleContent>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+            <xs:attribute type="xs:string" name="id" use="required"/>
+            <xs:attribute type="xs:byte" name="isFromMe" use="required"/>
+            <xs:attribute type="xs:string" name="service" use="required"/>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute type="xs:short" name="chatId" use="required"/>
+      <xs:attribute type="xs:string" name="id" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
