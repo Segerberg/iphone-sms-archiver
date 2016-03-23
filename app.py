@@ -8,19 +8,37 @@ import xml.etree.cElementTree as ET
 import hashlib
 import shutil
 import uuid
-
+import sys
+conversationUUID = str(uuid.uuid4()) # create a UUID; used as id for conversation
 xmlUUID = str(uuid.uuid4()) # create a UUID; used for naming xml-file and PREMIS objectIdentifierValue (xml-file)
 xsdUUID = str(uuid.uuid4()) # create a UUID; used for PREMIS objectIdentifierValue (xsd-file)
 xslUUID = str(uuid.uuid4()) # create a UUID; used for PREMIS objectIdentifierValue (xsl-file)
 eventUUID = str(uuid.uuid4()) # create a UUID; used for giving Event a uuid
-####TO DO###
-#Create UUID for event
+
 
 ### I don't know of any elegant way to get the phone owners name. An input prompt is the only option right now ##
-operatorAgentFName = 'Andreas'
-operatorAgentSName = 'Segerberg'
 myFname = raw_input('Please enter phone owners firstname and press enter: ')
 mySname = raw_input('Please enter phone owners surname and press enter: ')
+
+yes = set(['yes','y', 'ye', ''])
+no = set(['no','n'])
+
+while True:
+    try:
+        choice = raw_input('Is phone owner and operator the same person? ("y" or "n"): ')
+        if choice in yes:
+             operatorAgentFName = myFname
+             operatorAgentSName = mySname
+             break
+        elif choice in no:
+            operatorAgentFName = raw_input('Please enter operators firstname and press enter: ')
+            operatorAgentSName = raw_input('Please enter operators Surname and press enter: ')
+            break
+        else:
+            sys.stdout.write('Please respond with "yes" or "no")\n')
+    except:
+        pass
+
 timeStamp = datetime.datetime.strftime(datetime.datetime.now(), '%Y-%m-%dT%H:%M:%S') # Get the current datetimestamp for use as PREMIS-metadata
 
 
@@ -130,17 +148,18 @@ for row in t:
         extFname = row[0] #assign the found firstname to a variable
         extSname = row[1] #assign the found surname to a variable
 
+rootPath = extSname+'_'+extFname+'_'+chatIdChoice+'_UUID_'+conversationUUID
 ### Create some outputfolders ###
-if not os.path.exists(chatIdChoice):
-    os.makedirs(chatIdChoice)
-if not os.path.exists(chatIdChoice+'/content'):
-    os.makedirs(chatIdChoice+'/content')
-if not os.path.exists(chatIdChoice+'/content/attachments'):
-    os.makedirs(chatIdChoice+'/content/attachments')
-if not os.path.exists(chatIdChoice+'/system'):
-    os.makedirs(chatIdChoice+'/system')
-if not os.path.exists(chatIdChoice+'/metadata'):
-    os.makedirs(chatIdChoice+'/metadata')
+if not os.path.exists(rootPath):
+    os.makedirs(rootPath)
+if not os.path.exists(rootPath+'/content'):
+    os.makedirs(rootPath+'/content')
+if not os.path.exists(rootPath+'/content/attachments'):
+    os.makedirs(rootPath+'/content/attachments')
+if not os.path.exists(rootPath+'/system'):
+    os.makedirs(rootPath+'/system')
+if not os.path.exists(rootPath+'/metadata'):
+    os.makedirs(rootPath+'/metadata')
 
 xmlConversation = ET.Element('conversation') #Create the root element <conversation>
 
@@ -201,7 +220,7 @@ FROM
 	WHERE CMJ.chat_id ='''+chatIdChoice+'''
 	ORDER BY M.date'''):
 
-    xmlConversation.set('id', str(uuid.uuid4())) # Give the conversation  a UUID
+    xmlConversation.set('id', conversationUUID) # Give the conversation  a UUID
     xmlConversation.set('chatId',str(row[0])) # Set the chatid as an attribute to <conversation>
     xmlConversation.set('xmlns:xsi','http://www.w3.org/2001/XMLSchema-instance')
     xmlConversation.set('xsi:noNamespaceSchemaLocation','../system/schema.xsd')
@@ -245,7 +264,7 @@ FROM
         hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-')) # change the string to the correct name before checksum calculation
         formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
         xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
-        shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
+        shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
 
         ###Create a PREMIS file object for every attachment###
         premisObject = ET.SubElement(premis,'object')
@@ -262,9 +281,9 @@ FROM
         premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
         premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
         premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
-        premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName,'rb').read()).hexdigest()
+        premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName,'rb').read()).hexdigest()
         premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
-        premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName))
+        premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName))
         premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
         premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
         premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
@@ -280,17 +299,17 @@ FROM
 
 ###Write the XML to a file named after chat_id###
 tree = ET.ElementTree(xmlConversation)
-tree.write(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', encoding='utf-8', xml_declaration=False)
+tree.write(rootPath+'/content/'+xmlUUID+'.xml', encoding='utf-8', xml_declaration=False)
 
 ###We need to insert reference to the xslt###
-with open(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml', "r+") as f:
+with open(rootPath+'/content/'+xmlUUID+'.xml', "r+") as f:
      firstXml = f.read() # read everything in the xml-file
      f.seek(0) # Find the first line
      f.write('''<?xml version='1.0' encoding='utf-8'?>\n<?xml-stylesheet type="text/xsl" href="../system/style.xsl"?>\n'''+ firstXml) # insert the xml-declaration, xslt path and then the rest of the data
 
 #####Make a copy of the xslt and xsd to the SIP ###
-shutil.copy2('style.xsl',chatIdChoice+'/system/style.xsl')
-shutil.copy2('schema.xsd',chatIdChoice+'/system/schema.xsd')
+shutil.copy2('style.xsl',rootPath+'/system/style.xsl')
+shutil.copy2('schema.xsd',rootPath+'/system/schema.xsd')
 
 ### Create a PREMIS file object for the XSD-file ###
 premisObject = ET.SubElement(premis,'object')
@@ -307,9 +326,9 @@ premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharac
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
 premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
-premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/system/schema.xsd','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/system/schema.xsd','rb').read()).hexdigest()
 premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
-premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/system/schema.xsd'))
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/system/schema.xsd'))
 premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
 premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
 premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
@@ -335,9 +354,9 @@ premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharac
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
 premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
-premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/system/style.xsl','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/system/style.xsl','rb').read()).hexdigest()
 premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
-premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/system/style.xsl'))
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/system/style.xsl'))
 premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
 premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
 premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
@@ -363,9 +382,9 @@ premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharac
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
 premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
 premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
-premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml','rb').read()).hexdigest()
+premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/content/'+xmlUUID+'.xml','rb').read()).hexdigest()
 premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
-premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(chatIdChoice+'/content/'+chatIdChoice+'_'+xmlUUID+'.xml'))
+premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/content/'+xmlUUID+'.xml'))
 premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
 premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
 premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
@@ -433,6 +452,14 @@ premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue.text = '1'
 premisEventLinkingAgentIdentifierLinkingAgentRole = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentRole')
 premisEventLinkingAgentIdentifierLinkingAgentRole.text = 'executing program'
 
+premisEventLinkingAgentIdentifier = ET.SubElement(premisEvent,'linkingAgentIdentifier')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierType = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentIdentifierType')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierType.text = 'localAgentId'
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentIdentifierValue')
+premisEventLinkingAgentIdentifierLinkingAgentIdentifierValue.text = operatorAgentSName +',' + operatorAgentFName
+premisEventLinkingAgentIdentifierLinkingAgentRole = ET.SubElement(premisEventLinkingAgentIdentifier,'linkingAgentRole')
+premisEventLinkingAgentIdentifierLinkingAgentRole.text = 'archivist'
+
 ###Create a softwareAgent for this script###
 premisAgent = ET.SubElement(premis,'agent')
 premisAgentAgentIdentifier = ET.SubElement(premisAgent ,'agentIdentifier')
@@ -451,6 +478,17 @@ premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierType = E
 premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierType.text = 'localObjectId'
 premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierValue = ET.SubElement(premisAgentAgentLinkingEnvironmentIdentifier ,'linkingEnvironmentIdentifierValue')
 premisAgentAgentLinkingEnvironmentIdentifierLinkingEnvironmentIdentifierValue.text = '1'
+
+premisAgent = ET.SubElement(premis,'agent')
+premisAgentAgentIdentifier = ET.SubElement(premisAgent ,'agentIdentifier')
+premisAgentAgentIdentifierAgentIdentifierType = ET.SubElement(premisAgentAgentIdentifier ,'agentIdentifierType')
+premisAgentAgentIdentifierAgentIdentifierType.text = 'localAgentId'
+premisAgentAgentIdentifierAgentIdentifierValue = ET.SubElement(premisAgentAgentIdentifier ,'agentIdentifierValue')
+premisAgentAgentIdentifierAgentIdentifierValue.text = operatorAgentSName +',' + operatorAgentFName
+premisAgentAgentName = ET.SubElement(premisAgent ,'agentName')
+premisAgentAgentName.text = operatorAgentFName+' '+operatorAgentSName
+premisAgentAgentType = ET.SubElement(premisAgent ,'agentType')
+premisAgentAgentType.text = 'person'
 premisTree = ET.ElementTree(premis)
-premisTree.write(chatIdChoice+'/metadata/premis.xml', encoding='utf-8', xml_declaration=True)
+premisTree.write(rootPath+'/metadata/premis.xml', encoding='utf-8', xml_declaration=True)
 
