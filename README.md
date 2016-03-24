@@ -22,11 +22,13 @@ The Iarchiver script:
 
 * Spits out the sms/imessage as an xml-file 
 
-
+Dependencies
+-------------------
+You need to install the library bagit from the great folks at LOC before you can run the script  https://github.com/LibraryOfCongress/bagit-python
 
 Running the script
 -------------------
-First you need to connect your iPhone to iTunes and perform a local backup, Icloud-backup is not the way to go.
+You need to connect your iPhone to iTunes and perform a local backup, Icloud-backup is not the way to go.
 
     $ python app.py
 
