@@ -1,9 +1,12 @@
+# -*- coding: UTF-8 -*-
+import bagit
 import datetime
 import getpass
 import os
 import platform
 import re
 import sqlite3
+import tarfile
 import xml.etree.cElementTree as ET
 import hashlib
 import shutil
@@ -19,6 +22,8 @@ eventUUID = str(uuid.uuid4()) # create a UUID; used for giving Event a uuid
 ### I don't know of any elegant way to get the phone owners name. An input prompt is the only option right now ##
 myFname = raw_input('Please enter phone owners firstname and press enter: ')
 mySname = raw_input('Please enter phone owners surname and press enter: ')
+myFname = myFname.decode('utf-8')
+mySname = mySname.decode('utf-8')
 
 yes = set(['yes','y', 'ye', ''])
 no = set(['no','n'])
@@ -166,9 +171,8 @@ while True:
     except:
         pass
 
-
-rootPath = extSname+'_'+extFname+'_'+chatIdChoice+'_UUID_'+conversationUUID
 ### Create some outputfolders ###
+rootPath = extSname+'_'+extFname+'_'+chatIdChoice+'_UUID_'+conversationUUID
 if not os.path.exists(rootPath):
     os.makedirs(rootPath)
 if not os.path.exists(rootPath+'/content'):
@@ -219,7 +223,8 @@ premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierType.text 
 premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue = ET.SubElement(premisObjectRelationshipRelatedObjectIdentifier,'relatedObjectIdentifierValue')
 premisObjectRelationshipRelatedObjectIdentifierRelatedObjectIdentifierValue.text = 'https://github.com/Segerberg/iphone-sms-archiver'
 
-
+first = True
+last = None
 # It's time to query the messages db and construct the xml-export
 for row in mc.execute('''SELECT
     CMJ.chat_id, M.guid, M.text, H.id, M.service, M.date, M.is_from_me, FILE.filename, FILE.mime_type
@@ -238,7 +243,6 @@ FROM
 	on M.ROWID = CMJ.message_id
 	WHERE CMJ.chat_id ='''+chatIdChoice+'''
 	ORDER BY M.date'''):
-
     xmlConversation.set('id', conversationUUID) # Give the conversation  a UUID
     xmlConversation.set('chatId',str(row[0])) # Set the chatid as an attribute to <conversation>
     xmlConversation.set('xmlns:xsi','http://www.w3.org/2001/XMLSchema-instance')
@@ -277,6 +281,14 @@ FROM
     # We need to convert the cocoa timestamp to humanreadable time.
     # We add 978307200 seconds to go from unix epoch (1970-01-01T00:00:00) to cocoa epoch (2001-01-01T00:00:00)
     xmlDateTime.text = (datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d %H:%M:%S')) # Add datetime to <datetime>
+    ### We also want fetch the first message date (and the last later###
+    if first:
+        firstDate = datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d')
+        first = False
+    if last is not None:
+        pass
+    lastDate = datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d')
+
     ## If there's an attachment in the message we want to make a copy
     if row[7]:
         xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
@@ -510,4 +522,31 @@ premisAgentAgentType = ET.SubElement(premisAgent ,'agentType')
 premisAgentAgentType.text = 'person'
 premisTree = ET.ElementTree(premis)
 premisTree.write(rootPath+'/metadata/premis.xml', encoding='utf-8', xml_declaration=True)
+
+
+### Next step is to create a Bagit bag with som Dublin Core metadata in bag.info###
+bagitDict = {}
+contactNameKey = 'Contact-Name'
+contactNameValue = myFname+' '+mySname
+bagitDict[contactNameKey]=contactNameValue.encode('utf-8')
+dcTitleKey = 'dc:title'
+dcTitleValue = 'sms conversation'
+bagitDict[dcTitleKey] = dcTitleValue
+dcDescriptionKey = 'dc:description'
+dcDescriptionValue = 'conversation between '+myFname+' '+mySname+' and '+extFname+' '+extSname
+bagitDict[dcDescriptionKey] = dcDescriptionValue.encode('utf-8')
+dcCoverageKey = 'dc:coverage'
+dcCoverageValue = firstDate+' - '+lastDate
+bagitDict[dcCoverageKey] = dcCoverageValue
+dcCreatorKey = 'dc:creator'
+dcCreatorValue = myFname+' '+mySname
+bagitDict[dcCreatorKey] = dcCreatorValue.encode('utf-8')
+bag = bagit.make_bag(str(rootPath.encode('utf-8')), bagitDict)
+
+###Final step is to make a TAR-file###
+tar = tarfile.open(extFname+'_'+extSname+'_'+conversationUUID+".tar", "w")
+tar.add(rootPath)
+tar.close()
+
+
 
