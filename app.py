@@ -147,6 +147,25 @@ for row in t:
     if str(row[3]) == chatIdChoice: # Find the chatIdchoice in the list
         extFname = row[0] #assign the found firstname to a variable
         extSname = row[1] #assign the found surname to a variable
+###Give user option to create an alias if a contact-name is not formatted right###
+print 'Do you want to use "'+extFname+' '+extSname+'" as naming for contact '
+
+while True:
+    try:
+        choice = raw_input('("y" or "n"): ')
+        if choice in yes:
+             extFname = extFname
+             extSname = extSname
+             break
+        elif choice in no:
+            extSname = raw_input('Please enter contact firstname and press enter: ')
+            extSname = raw_input('Please enter contact Surname and press enter: ')
+            break
+        else:
+            sys.stdout.write('Please respond with "yes" or "no")\n')
+    except:
+        pass
+
 
 rootPath = extSname+'_'+extFname+'_'+chatIdChoice+'_UUID_'+conversationUUID
 ### Create some outputfolders ###
