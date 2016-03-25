@@ -525,23 +525,26 @@ premisTree.write(rootPath+'/metadata/premis.xml', encoding='utf-8', xml_declarat
 
 
 ### Next step is to create a Bagit bag with som Dublin Core metadata in bag.info###
-bagitDict = {}
-contactNameKey = 'Contact-Name'
-contactNameValue = myFname+' '+mySname
-bagitDict[contactNameKey]=contactNameValue.encode('utf-8')
-dcTitleKey = 'dc:title'
-dcTitleValue = 'sms conversation'
-bagitDict[dcTitleKey] = dcTitleValue
-dcDescriptionKey = 'dc:description'
-dcDescriptionValue = 'conversation between '+myFname+' '+mySname+' and '+extFname+' '+extSname
-bagitDict[dcDescriptionKey] = dcDescriptionValue.encode('utf-8')
-dcCoverageKey = 'dc:coverage'
-dcCoverageValue = firstDate+' - '+lastDate
-bagitDict[dcCoverageKey] = dcCoverageValue
-dcCreatorKey = 'dc:creator'
-dcCreatorValue = myFname+' '+mySname
-bagitDict[dcCreatorKey] = dcCreatorValue.encode('utf-8')
-bag = bagit.make_bag(str(rootPath.encode('utf-8')), bagitDict)
+try:
+    bagitDict = {}
+    contactNameKey = 'Contact-Name'
+    contactNameValue = myFname+' '+mySname
+    bagitDict[contactNameKey]=contactNameValue.encode('utf-8')
+    dcTitleKey = 'dc:title'
+    dcTitleValue = 'sms conversation'
+    bagitDict[dcTitleKey] = dcTitleValue
+    dcDescriptionKey = 'dc:description'
+    dcDescriptionValue = 'conversation between '+myFname+' '+mySname+' and '+extFname+' '+extSname
+    bagitDict[dcDescriptionKey] = dcDescriptionValue.encode('utf-8')
+    dcCoverageKey = 'dc:coverage'
+    dcCoverageValue = firstDate+' - '+lastDate
+    bagitDict[dcCoverageKey] = dcCoverageValue
+    dcCreatorKey = 'dc:creator'
+    dcCreatorValue = myFname+' '+mySname
+    bagitDict[dcCreatorKey] = dcCreatorValue.encode('utf-8')
+    bag = bagit.make_bag(str(rootPath.encode('utf-8')), bagitDict)
+except:
+    print 'ERROR: The conversation you tried to export was probably empty. Please check your output'
 
 ###Final step is to make a TAR-file###
 tar = tarfile.open(extFname+'_'+extSname+'_'+conversationUUID+".tar", "w")
