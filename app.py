@@ -152,6 +152,11 @@ for row in t:
     if str(row[3]) == chatIdChoice: # Find the chatIdchoice in the list
         extFname = row[0] #assign the found firstname to a variable
         extSname = row[1] #assign the found surname to a variable
+#Check that extFname and extSname has values
+if extSname == None:
+    extSname = 'None'
+if extFname == None:
+    extFname = 'None'
 ###Give user option to create an alias if a contact-name is not formatted right###
 print 'Do you want to use "'+extFname+' '+extSname+'" as naming for contact '
 
@@ -530,18 +535,21 @@ try:
     contactNameKey = 'Contact-Name'
     contactNameValue = myFname+' '+mySname
     bagitDict[contactNameKey]=contactNameValue.encode('utf-8')
-    dcTitleKey = 'dc:title'
+    dcTitleKey = 'dc-title'
     dcTitleValue = 'sms conversation'
     bagitDict[dcTitleKey] = dcTitleValue
-    dcDescriptionKey = 'dc:description'
+    dcDescriptionKey = 'dc-description'
     dcDescriptionValue = 'conversation between '+myFname+' '+mySname+' and '+extFname+' '+extSname
     bagitDict[dcDescriptionKey] = dcDescriptionValue.encode('utf-8')
-    dcCoverageKey = 'dc:coverage'
+    dcCoverageKey = 'dc-coverage'
     dcCoverageValue = firstDate+' - '+lastDate
     bagitDict[dcCoverageKey] = dcCoverageValue
-    dcCreatorKey = 'dc:creator'
+    dcCreatorKey = 'dc-creator'
     dcCreatorValue = myFname+' '+mySname
     bagitDict[dcCreatorKey] = dcCreatorValue.encode('utf-8')
+    dcContributorKey = 'dc-contributor'
+    dcContributorValue = extFname+' '+extSname
+    bagitDict[dcContributorKey] = dcContributorValue.encode('utf-8')
     bag = bagit.make_bag(str(rootPath.encode('utf-8')), bagitDict)
 except:
     print 'ERROR: The conversation you tried to export was probably empty. Please check your output'
