@@ -297,7 +297,7 @@ FROM
     ## If there's an attachment in the message we want to make a copy
     if row[7]:
         xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
-        hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-')) # change the string to the correct name before checksum calculation
+        hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-').encode('utf-8')) # change the string to the correct name before checksum calculation
         formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
         xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
         shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
