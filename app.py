@@ -104,14 +104,14 @@ while True:
      except:
          print 'Bad input, please try again'
 
-with sqlite3.connect(backupPath+dictList[backupChoice]+'/3d0d7e5fb2ce288813306e4d4636395e047a3d28') as message_connection:
+with sqlite3.connect(backupPath+dictList[backupChoice]+'/3d/3d0d7e5fb2ce288813306e4d4636395e047a3d28') as message_connection:
     mc = message_connection.cursor()
 
 ### Connect to the contacts database ###
 t = []
-with sqlite3.connect(backupPath+dictList[backupChoice]+'/31bb7ba8914766d4ba40d6dfb6113c8b614be442') as contacts_connection:
+with sqlite3.connect(backupPath+dictList[backupChoice]+'/31/31bb7ba8914766d4ba40d6dfb6113c8b614be442') as contacts_connection:
     cc = contacts_connection.cursor()
-for row in cc.execute('''SELECT c0first, c1last, c15Phone FROM ABPersonFullTextSearch_content '''):
+for row in cc.execute('''SELECT c0first, c1last, c16Phone FROM ABPersonFullTextSearch_content '''):
         # There is probably a much nicer less retarded way to do this...
         try:
             #first we need to convert tuples into a list (since the sql response comes in tuples and they are immutable)
@@ -296,11 +296,13 @@ FROM
 
     ## If there's an attachment in the message we want to make a copy
     if row[7]:
+        print row[7]
         xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
         hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-').encode('utf-8')) # change the string to the correct name before checksum calculation
         formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
         xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
-        shutil.copy2(backupPath+dictList[backupChoice]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
+        attachmentDir = hashSha.hexdigest() # Get the two first letters from hash used to name the dir
+        shutil.copy2(backupPath+dictList[backupChoice]+'/'+attachmentDir[:2]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
 
         ###Create a PREMIS file object for every attachment###
         premisObject = ET.SubElement(premis,'object')
