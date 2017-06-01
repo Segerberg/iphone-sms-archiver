@@ -16,7 +16,9 @@ The Iarchiver script:
 
 * Does recover text with photos and other attachments 
 
-* Works with IOS 8 and 9 
+* ~~Works with IOS 8 and 9~~ 
+
+* Works with IOS 10
 
 * Does NOT handle group chats (yet) 
 
