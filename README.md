@@ -38,6 +38,3 @@ You need to connect your iPhone to iTunes and perform a local backup (no encrypt
 
 Then just follow the instructions. 
 
-
-For information about this project please visit: 
-http://arkivwiki.se/doku.php?id=verktyg:ima
