@@ -12,6 +12,11 @@ import hashlib
 import shutil
 import uuid
 import sys
+
+unix = datetime.datetime(1970, 1, 1)  # UTC
+cocoa = datetime.datetime(2001, 1, 1)  # UTC
+delta = cocoa - unix
+
 conversationUUID = str(uuid.uuid4()) # create a UUID; used as id for conversation
 xmlUUID = str(uuid.uuid4()) # create a UUID; used for naming xml-file and PREMIS objectIdentifierValue (xml-file)
 xsdUUID = str(uuid.uuid4()) # create a UUID; used for PREMIS objectIdentifierValue (xsd-file)
@@ -285,55 +290,63 @@ FROM
     xmlText.text = row[2]
     # We need to convert the cocoa timestamp to humanreadable time.
     # We add 978307200 seconds to go from unix epoch (1970-01-01T00:00:00) to cocoa epoch (2001-01-01T00:00:00)
-    xmlDateTime.text = (datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d %H:%M:%S')) # Add datetime to <datetime>
+    #xmlDateTime.text = (datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d %H:%M:%S')) # Add datetime to <datetime>
+    timestamp = datetime.datetime.fromtimestamp(int(row[5] / 1000000000)) + delta
+    xmlDateTime.text = timestamp.strftime('%Y-%m-%d %H:%M:%S')
     ### We also want fetch the first message date (and the last later###
     if first:
-        firstDate = datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d')
+    	timestamp = datetime.datetime.fromtimestamp(int(row[5] / 1000000000)) + delta
+        firstDate = timestamp.strftime('%Y-%m-%d')
         first = False
     if last is not None:
         pass
-    lastDate = datetime.datetime.fromtimestamp(row[5]+978307200).strftime('%Y-%m-%d')
+    lasttimestamp = datetime.datetime.fromtimestamp(int(row[5] / 1000000000)) + delta
+         
+    lastDate = lasttimestamp.strftime('%Y-%m-%d')
 
     ## If there's an attachment in the message we want to make a copy
     if row[7]:
-        print row[7]
-        xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
-        hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-').encode('utf-8')) # change the string to the correct name before checksum calculation
-        formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
-        xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
-        attachmentDir = hashSha.hexdigest() # Get the two first letters from hash used to name the dir
-        shutil.copy2(backupPath+dictList[backupChoice]+'/'+attachmentDir[:2]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
+        try:
+            print row[7]
+            xmlAttachment = ET.SubElement(xmlMessage,'attachment') # Creates the attachment subelement
+            hashSha = hashlib.sha1(row[7].replace('~/','MediaDomain-').encode('utf-8')) # change the string to the correct name before checksum calculation
+            formatName = row[7].split(".",1)[1] # Fetch the right fileextentsion from filepath i database
+            xmlAttachment.set ('file',hashSha.hexdigest()+'.'+formatName) # write the modified path/filename to the xml-export
+            attachmentDir = hashSha.hexdigest() # Get the two first letters from hash used to name the dir
+            shutil.copy2(backupPath+dictList[backupChoice]+'/'+attachmentDir[:2]+'/'+hashSha.hexdigest(),rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName)#Copy the attachment from backup to the archiving folder and add the correct file extenstion
 
-        ###Create a PREMIS file object for every attachment###
-        premisObject = ET.SubElement(premis,'object')
-        premisObject.set('xsi:type','file')
-        premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
-        premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
-        premisObjectIdentfierType.text = 'sha-1'
-        premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
-        premisObjectIdentfierValue.text = hashSha.hexdigest()
-        premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
-        premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
-        premisObjectObjectCharacteristicsCompositionLevel.text = '0'
-        premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
-        premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
-        premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
-        premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
-        premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName,'rb').read()).hexdigest()
-        premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
-        premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName))
-        premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
-        premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
-        premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
-        premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = row[8]
-        premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
-        premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
-        premisObjectObjectCharacteristicsCreatingApplicationDate.text = 'unknowed'
-        premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
-        premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
-        premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
-        premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
-        premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
+            ###Create a PREMIS file object for every attachment###
+            premisObject = ET.SubElement(premis,'object')
+            premisObject.set('xsi:type','file')
+            premisObjectIdentfier = ET.SubElement(premisObject,'objectIdentifier')
+            premisObjectIdentfierType = ET.SubElement(premisObjectIdentfier,'objectIdentifierType')
+            premisObjectIdentfierType.text = 'sha-1'
+            premisObjectIdentfierValue = ET.SubElement(premisObjectIdentfier,'objectIdentifierValue')
+            premisObjectIdentfierValue.text = hashSha.hexdigest()
+            premisObjectObjectCharacteristics = ET.SubElement(premisObject,'objectCharacteristics')
+            premisObjectObjectCharacteristicsCompositionLevel = ET.SubElement(premisObjectObjectCharacteristics,'compositionLevel')
+            premisObjectObjectCharacteristicsCompositionLevel.text = '0'
+            premisObjectObjectCharacteristicsFixity = ET.SubElement(premisObjectObjectCharacteristics,'fixity')
+            premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigestAlgorithm')
+            premisObjectObjectCharacteristicsFixityMessageDigestAlgorithm.text = 'md5'
+            premisObjectObjectCharacteristicsFixityMessageDigest = ET.SubElement(premisObjectObjectCharacteristicsFixity,'messageDigest')
+            premisObjectObjectCharacteristicsFixityMessageDigest.text = hashlib.md5(open(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName,'rb').read()).hexdigest()
+            premisObjectObjectCharacteristicsSize = ET.SubElement(premisObjectObjectCharacteristics,'size')
+            premisObjectObjectCharacteristicsSize.text = str(os.path.getsize(rootPath+'/content/attachments/'+hashSha.hexdigest()+'.'+formatName))
+            premisObjectObjectCharacteristicsFormat = ET.SubElement(premisObjectObjectCharacteristics,'format')
+            premisObjectObjectCharacteristicsFormatFormatDesignation= ET.SubElement(premisObjectObjectCharacteristicsFormat,'formatDesignation')
+            premisObjectObjectCharacteristicsFormatFormatDesignationFormatName = ET.SubElement(premisObjectObjectCharacteristicsFormatFormatDesignation,'formatName')
+            premisObjectObjectCharacteristicsFormatFormatDesignationFormatName.text = row[8]
+            premisObjectObjectCharacteristicsCreatingApplication = ET.SubElement(premisObjectObjectCharacteristics,'creatingApplication')
+            premisObjectObjectCharacteristicsCreatingApplicationDate = ET.SubElement(premisObjectObjectCharacteristicsCreatingApplication,'dateCreatedByApplication')
+            premisObjectObjectCharacteristicsCreatingApplicationDate.text = 'unknowed'
+            premisLinkingEventIdentifier = ET.SubElement(premisObject,'linkingEventIdentifier')
+            premisLinkingEventIdentifierLinkingEventIdentifierType = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierType')
+            premisLinkingEventIdentifierLinkingEventIdentifierType.text = 'uuid'
+            premisLinkingEventIdentifierLinkingEventIdentifierValue = ET.SubElement(premisLinkingEventIdentifier,'linkingEventIdentifierValue')
+            premisLinkingEventIdentifierLinkingEventIdentifierValue.text = eventUUID
+        except:
+            pass
 
 ###Write the XML to a file named after chat_id###
 tree = ET.ElementTree(xmlConversation)
@@ -560,6 +573,3 @@ except:
 tar = tarfile.open(extFname+'_'+extSname+'_'+conversationUUID+".tar", "w")
 tar.add(rootPath)
 tar.close()
-
-
-
