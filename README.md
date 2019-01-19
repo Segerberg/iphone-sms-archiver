@@ -18,7 +18,9 @@ The Iarchiver script:
 
 * ~~Works with IOS 8 and 9~~ 
 
-* Works with IOS 10
+* ~~Works with IOS 10~~ 
+
+* Works with IOS 11 
 
 * Does NOT handle group chats (yet) 
 
@@ -30,7 +32,7 @@ You need to install the library bagit from the great folks at LOC before you can
 
 Running the script
 -------------------
-You need to connect your iPhone to iTunes and perform a local backup, Icloud-backup is not the way to go.
+You need to connect your iPhone to iTunes and perform a local backup (no encryption), Icloud-backup is not the way to go.
 
     $ python app.py
 
